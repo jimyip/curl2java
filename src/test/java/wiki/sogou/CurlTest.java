@@ -2,26 +2,30 @@ package wiki.sogou;
 
 import org.junit.Test;
 
-import java.util.Arrays;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class CurlTest {
+
     /**
      * user agent
      */
     @Test
-    public void testA() {
-        String command = "curl -A " +
+    public void testA() throws SQLException {
+        String command = "curl              -A " +
                 "'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
                 "(KHTML, like Gecko) Chrome/76.0.3809.100 Safari/537.36' " +
                 "https://google.com";
-        String command2 = "curl -A '' https://google.com";
-
-        String[] args = command.split("\\s");
-        System.out.println(Arrays.toString(args));
-
-        String[] args2 = command.split("\\s");
-        System.out.println(Arrays.toString(args2));
+        String command2 = "curl      -A '' https://google.com";
+        List<String> list = parseColumns(command, Curl.WHITE_SPACE);
+        List<String> list2 = parseColumns(command2, Curl.WHITE_SPACE);
+        System.out.println(list);
+        System.out.println(list2);
+        System.out.println(list.size());
+        System.out.println(list2.size());
     }
+
 
     /**
      * cookie
@@ -164,5 +168,75 @@ public class CurlTest {
         String command = "curl -X POST https://www.example.com";
     }
 
+
+    List<String> parseColumns(String line, final char separator) throws SQLException {
+        List<String> columns = new ArrayList<>();
+        StringBuilder value = new StringBuilder();
+        boolean spaceFlag = false;
+        MainLoop:
+        for (int i = 0, max = line.length(); i < max; i++) {
+            char ch = line.charAt(i);
+            if (ch == '"' || ch == '\'') {
+                spaceFlag = false;
+                // quoted start
+                if (value.toString().trim().length() != 0) {
+                    // now not support quoted in middle field, etc: abc"xyz" will cause Exception
+                    throw new SQLException("Unexpected char '" + ch + "', position=" + i);
+                }
+                // ignore the before-ing white spaces
+                value.setLength(0);
+                // find end quote mark in this line and after lines
+                for (i++; ; ) {
+                    if (i < max) {
+                        ch = line.charAt(i);
+                        if (ch == '"' || ch == '\'') {
+                            if ((i + 1 < max) && (line.charAt(i + 1) == '"' || line.charAt(i + 1) == '\'')) {
+                                // double quote
+                                value.append(ch);
+                                i += 2;
+                                continue;
+                            }
+                            // the only valid exit point that match quote
+                            // find separator
+                            while (++i < max) {
+                                ch = line.charAt(i);
+                                if (ch == separator) {
+                                    columns.add(value.toString());
+                                    value.setLength(0);
+                                    continue MainLoop;
+                                } else if (Character.isWhitespace(ch)) {
+                                    continue;
+                                }
+                                throw new SQLException("Unexpected char '" + ch + "', position=" + i);
+                            }
+                            // reaches end-of-line
+                            break MainLoop;
+                        } else {
+                            value.append(ch);
+                        }
+                        i++;
+                    } else {
+                        // continue find end quote mark in next line
+                        // reset cursor
+                        i = 0;
+                        max = line.length();
+                    }
+                }
+            } else if (ch == separator) {
+                if (spaceFlag && Character.isWhitespace(ch)) {
+                    continue;
+                }
+                columns.add(value.toString());
+                value.setLength(0);
+                spaceFlag = true;
+            } else {
+                spaceFlag = false;
+                value.append(ch);
+            }
+        }
+        // last field
+        columns.add(value.toString());
+        return columns;
+    }
 
 }
