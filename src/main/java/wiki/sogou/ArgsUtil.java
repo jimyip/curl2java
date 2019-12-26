@@ -6,18 +6,22 @@ import java.util.List;
 /**
  * @author JimYip
  */
-public class DefaultParser implements Parser {
+public class ArgsUtil {
     public static final char WHITE_SPACE = 32;
 
-    @Override
-    public List<String> parseColumns(String line, char separator) {
+    private ArgsUtil() {
+    }
+
+    public static List<String> parseColumns(String line, char separator) {
         List<String> columns = new ArrayList<>();
         StringBuilder value = new StringBuilder();
         boolean whiteSpaceFlag = false;
+        char start;
         MainLoop:
         for (int i = 0, max = line.length(); i < max; i++) {
             char ch = line.charAt(i);
             if (ch == '"' || ch == '\'') {
+                start = ch;
                 whiteSpaceFlag = false;
                 // quoted start
                 if (value.toString().trim().length() != 0) {
@@ -30,7 +34,7 @@ public class DefaultParser implements Parser {
                 for (i++; ; ) {
                     if (i < max) {
                         ch = line.charAt(i);
-                        if (ch == '"' || ch == '\'') {
+                        if (start == ch) {
                             if ((i + 1 < max) && (line.charAt(i + 1) == '"' || line.charAt(i + 1) == '\'')) {
                                 // double quote
                                 value.append(ch);
@@ -80,8 +84,7 @@ public class DefaultParser implements Parser {
         return columns;
     }
 
-    @Override
-    public List<String> parseColumns(String line) {
+    public static List<String> parseColumns(String line) {
         return parseColumns(line, WHITE_SPACE);
     }
 }
